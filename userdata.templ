@@ -1,0 +1,31 @@
+#!/bin/bash
+/usr/bin/timedatectl set-timezone America/Los_Angeles
+/bin/hostname {{.Env.SERVERNAME}}
+echo PS1=\"[\\u@{{.Env.SERVERNAME}}]\" >> /etc/bashrc 
+systemctl restart sshd.service
+
+apt update
+apt install -y python3-pip unzip
+curl -o /usr/local/bin/terraform.zip https://releases.hashicorp.com/terraform/0.12.20/terraform_0.12.20_linux_amd64.zip
+curl -o /usr/local/bin/gomplate -sSL https://github.com/hairyhenderson/gomplate/releases/download/v3.6.0/gomplate_linux-amd64
+cd /usr/local/bin
+unzip terraform.zip
+pip3 install awscli --upgrade
+aws s3 cp s3://toai-test.s.e/add.txt /tmp/add.txt
+aws s3 cp s3://toai-test.s.e/run.sh /tmp/run.sh
+aws s3 rm s3://toai-test.s.e/job.done
+chmod 700 /tmp/run.sh
+
+INST_ID=`curl http://169.254.169.254/latest/meta-data/instance-id`
+aws s3 rm s3://toai-test.s.e/instantid.txt
+echo $INST_ID > /tmp/instantid.txt
+aws s3 cp /tmp/instantid.txt s3://toai-test.s.e/instantid.txt
+
+cd /tmp
+echo "Processing ..."
+/tmp/run.sh
+echo "Copy Output file to S3 bucket ..."
+aws s3 cp /tmp/total.txt s3://toai-test.s.e/total.txt
+echo $DATE > /tmp/job.done
+echo "Job completed ..."
+aws s3 /tmp/job.done cp s3://toai-test.s.e/job.done
